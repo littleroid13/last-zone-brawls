@@ -30,6 +30,11 @@
     </div>
 
     <div class="flex items-center gap-2 sm:gap-2.5">
+      <!-- Fullscreen Toggle Button (Touch Friendly) -->
+      <button onclick="toggleFullscreen()" id="header-fullscreen-btn" title="Layar Penuh (Fullscreen)" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/90 hover:bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center justify-center text-sm sm:text-base transition active:scale-95 shadow cursor-pointer">
+        <i id="header-fullscreen-icon" class="fa-solid fa-expand"></i>
+      </button>
+
       <!-- Mute Toggle Button (Touch Friendly) -->
       <button onclick="toggleAudioMute()" id="header-audio-btn" title="Mute / Unmute Audio" class="h-9 sm:h-10 px-3 sm:px-3.5 rounded-xl bg-slate-900/90 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-xs sm:text-sm font-bold flex items-center gap-2 transition active:scale-95 shadow cursor-pointer">
         <i id="header-audio-icon" class="fa-solid fa-volume-high text-sm sm:text-base"></i>
@@ -51,9 +56,15 @@
         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
         <span>TACTICAL SECURITY GATEWAY v2.4</span>
       </div>
-      <div class="hidden sm:flex items-center gap-3 text-[11px]">
-        <span>ENCRYPTION: AES-256</span>
-        <span>STATUS: SYSTEM LOCKED</span>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-3 text-[11px]">
+          <span>ENCRYPTION: AES-256</span>
+          <span>STATUS: SYSTEM LOCKED</span>
+        </div>
+        <button onclick="toggleFullscreen()" id="login-fullscreen-btn" title="Layar Penuh (Fullscreen)" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[11px] font-sans font-bold flex items-center gap-1.5 transition active:scale-95 shadow cursor-pointer">
+          <i id="login-fullscreen-icon" class="fa-solid fa-expand"></i>
+          <span class="hidden sm:inline">FULLSCREEN</span>
+        </button>
       </div>
     </div>
 
@@ -220,6 +231,10 @@
       
       <!-- Top Left Cyber Action Buttons -->
       <div class="flex items-center gap-2">
+        <!-- Fullscreen Button -->
+        <button onclick="toggleFullscreen()" id="lobby-fullscreen-btn" title="Layar Penuh (Fullscreen)" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/80 hover:bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center justify-center transition shadow-lg active:scale-95 cursor-pointer">
+          <i id="lobby-fullscreen-icon" class="fa-solid fa-expand text-sm sm:text-base"></i>
+        </button>
         <button onclick="toggleAudioMute()" id="lobby-audio-btn" title="Audio Game ON/OFF" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/80 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center transition shadow-lg active:scale-95 cursor-pointer">
           <i id="lobby-audio-icon" class="fa-solid fa-volume-high text-sm sm:text-base"></i>
         </button>

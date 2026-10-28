@@ -4681,6 +4681,95 @@ const unlockAudioOnFirstGesture = () => {
 document.addEventListener('click', unlockAudioOnFirstGesture, { once: true });
 document.addEventListener('touchstart', unlockAudioOnFirstGesture, { once: true });
 
+// ----------------------------------------------------------------------------
+// 20. FULLSCREEN CONTROLLER (SMART TV & IMMERSIVE BROWSER MODE)
+// ----------------------------------------------------------------------------
+function isFullscreenActive() {
+  return !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+}
+
+function toggleFullscreen() {
+  if (typeof audioManager !== 'undefined' && audioManager.play) {
+    audioManager.play('click');
+  }
+
+  if (!isFullscreenActive()) {
+    const docEl = document.documentElement;
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen().catch(err => console.warn('Fullscreen request failed:', err));
+    } else if (docEl.webkitRequestFullscreen) {
+      docEl.webkitRequestFullscreen();
+    } else if (docEl.mozRequestFullScreen) {
+      docEl.mozRequestFullScreen();
+    } else if (docEl.msRequestFullscreen) {
+      docEl.msRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(err => console.warn('Exit fullscreen failed:', err));
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  }
+}
+
+function updateFullscreenUI() {
+  const isFS = isFullscreenActive();
+
+  // Header Fullscreen Button
+  const hIcon = document.getElementById('header-fullscreen-icon');
+  const hBtn = document.getElementById('header-fullscreen-btn');
+  if (hIcon) {
+    hIcon.className = isFS ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+  }
+  if (hBtn) {
+    hBtn.title = isFS ? 'Keluar Fullscreen (Esc)' : 'Layar Penuh (Fullscreen)';
+  }
+
+  // Lobby Fullscreen Button
+  const lIcon = document.getElementById('lobby-fullscreen-icon');
+  const lBtn = document.getElementById('lobby-fullscreen-btn');
+  if (lIcon) {
+    lIcon.className = isFS ? 'fa-solid fa-compress text-sm sm:text-base' : 'fa-solid fa-expand text-sm sm:text-base';
+  }
+  if (lBtn) {
+    lBtn.title = isFS ? 'Keluar Fullscreen (Esc)' : 'Layar Penuh (Fullscreen)';
+  }
+
+  // Login Screen Fullscreen Button
+  const loginIcon = document.getElementById('login-fullscreen-icon');
+  const loginBtn = document.getElementById('login-fullscreen-btn');
+  if (loginIcon) {
+    loginIcon.className = isFS ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+  }
+  if (loginBtn) {
+    loginBtn.title = isFS ? 'Keluar Fullscreen (Esc)' : 'Layar Penuh (Fullscreen)';
+  }
+
+  // Recalculate canvas resolution and refresh background
+  if (typeof resizeIsoCanvas === 'function') {
+    setTimeout(resizeIsoCanvas, 150);
+  }
+}
+
+// Fullscreen Event Listeners (Handles F11, Esc, button clicks, or Smart TV gestures)
+document.addEventListener('fullscreenchange', updateFullscreenUI);
+document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
+document.addEventListener('mozfullscreenchange', updateFullscreenUI);
+document.addEventListener('MSFullscreenChange', updateFullscreenUI);
+
+window.toggleFullscreen = toggleFullscreen;
+window.updateFullscreenUI = updateFullscreenUI;
+
 // Initialize Game
 AudioManager.init();
 fetchServerInfo();
