@@ -36,11 +36,122 @@ function tileToScreen(tx, ty) {
  */
 function screenToTile(sx, sy) {
   const state = window.GameEngine.getState();
-  const adjX = (sx - state.camX) / state.zoom;
-  const adjY = (sy - state.camY) / state.zoom;
+  const scale = state.isoCanvas && state.isoCanvas.clientWidth ? (state.isoCanvas.width / state.isoCanvas.clientWidth) : 1;
+  const px = sx * scale;
+  const py = sy * scale;
+  const adjX = (px - state.camX) / state.zoom;
+  const adjY = (py - state.camY) / state.zoom;
   const tx = Math.floor((adjX / (TILE_W / 2) + adjY / (TILE_H / 2)) / 2);
   const ty = Math.floor((adjY / (TILE_H / 2) - adjX / (TILE_W / 2)) / 2);
   return { x: tx, y: ty };
+}
+
+// ─────────────────────────────────────────────
+// ▸ STATIC BACKGROUND OFFSCREEN CANVAS (OPTIMIZED LAYER)
+// ─────────────────────────────────────────────
+let backgroundCanvas = null;
+let bgCtx = null;
+let isBgDirty = true;
+let lastCamX = null;
+let lastCamY = null;
+let lastZoom = null;
+let lastCanvasW = null;
+let lastCanvasH = null;
+let lastSafePhase = null;
+let lastMapSize = null;
+
+function invalidateBackground() {
+  isBgDirty = true;
+}
+
+function initBackgroundCanvas() {
+  if (!backgroundCanvas) {
+    backgroundCanvas = document.createElement('canvas');
+    bgCtx = backgroundCanvas.getContext('2d', { alpha: false });
+  }
+}
+
+function drawStaticBackground(mainCtx) {
+  const state = window.GameEngine.getState();
+  if (!state || !state.isoCanvas) return;
+
+  initBackgroundCanvas();
+
+  const isoCanvas = state.isoCanvas;
+  const needsRebake = isBgDirty ||
+    lastCamX !== state.camX ||
+    lastCamY !== state.camY ||
+    lastZoom !== state.zoom ||
+    lastCanvasW !== isoCanvas.width ||
+    lastCanvasH !== isoCanvas.height ||
+    lastSafePhase !== (state.safeZone ? state.safeZone.phase : null) ||
+    lastMapSize !== state.mapSize;
+
+  if (needsRebake) {
+    if (backgroundCanvas.width !== isoCanvas.width || backgroundCanvas.height !== isoCanvas.height) {
+      backgroundCanvas.width = isoCanvas.width;
+      backgroundCanvas.height = isoCanvas.height;
+    }
+
+    // 1. Draw radial gradient background
+    const grad = bgCtx.createRadialGradient(
+      backgroundCanvas.width / 2, backgroundCanvas.height / 2, 80,
+      backgroundCanvas.width / 2, backgroundCanvas.height / 2, backgroundCanvas.width * 0.75
+    );
+    grad.addColorStop(0, '#1e3a5f');
+    grad.addColorStop(0.65, '#172554');
+    grad.addColorStop(1, '#2e1065');
+    bgCtx.fillStyle = grad;
+    bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+
+    // 2. Draw static isometric tiles (grid, grass, water, dirt)
+    const minCoord = -state.OUTFIELD_MARGIN;
+    const maxCoord = state.mapSize + state.OUTFIELD_MARGIN - 1;
+    const minSum = minCoord * 2;
+    const maxSum = maxCoord * 2;
+
+    const getTile = (window.GameEngine && window.GameEngine.getTileAt) || function(x, y) {
+      if (x >= 0 && x < state.mapSize && y >= 0 && y < state.mapSize) {
+        return state.mapGrid[y] && state.mapGrid[y][x];
+      }
+      return state.outfieldGrid[y] && state.outfieldGrid[y][x];
+    };
+
+    for (let sum = minSum; sum <= maxSum; sum++) {
+      for (let x = minCoord; x <= maxCoord; x++) {
+        const y = sum - x;
+        if (y >= minCoord && y <= maxCoord) {
+          const tile = getTile(x, y);
+          if (tile) {
+            drawIsometricTileBlock(bgCtx, x, y, tile);
+          }
+        }
+      }
+    }
+
+    // 3. Draw static environment props (buildings, trees, rocks)
+    for (let y = minCoord; y <= maxCoord; y++) {
+      for (let x = minCoord; x <= maxCoord; x++) {
+        const tile = getTile(x, y);
+        if (tile && tile.deco) {
+          drawEnvironmentProp(bgCtx, x, y, tile.deco);
+        }
+      }
+    }
+
+    // Save camera & map state
+    lastCamX = state.camX;
+    lastCamY = state.camY;
+    lastZoom = state.zoom;
+    lastCanvasW = isoCanvas.width;
+    lastCanvasH = isoCanvas.height;
+    lastSafePhase = state.safeZone ? state.safeZone.phase : null;
+    lastMapSize = state.mapSize;
+    isBgDirty = false;
+  }
+
+  // Blit offscreen background to main context in a single call!
+  mainCtx.drawImage(backgroundCanvas, 0, 0);
 }
 
 // ─────────────────────────────────────────────
@@ -566,12 +677,9 @@ function drawEnvironmentProp(ctx, tx, ty, decoType) {
 
     // Pulsing Red Warning Beacon
     ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(x, y - 35 * zoom, 2.5 * zoom, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
   } else if (decoType === 'building_power') {
     // 4. Quantum Power Reactor Core
     ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
@@ -588,12 +696,9 @@ function drawEnvironmentProp(ctx, tx, ty, decoType) {
     // Glowing Reactor Ring
     const corePulse = 0.65 + Math.sin(state.animTick * 0.08) * 0.35;
     ctx.fillStyle = `rgba(6, 182, 212, ${corePulse})`;
-    ctx.shadowColor = '#06b6d4';
-    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.roundRect(x - 9 * zoom, y - 12 * zoom, 18 * zoom, 7 * zoom, 2 * zoom);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Dome Top
     ctx.fillStyle = '#94a3b8';
@@ -895,9 +1000,6 @@ function drawEnvironmentProp(ctx, tx, ty, decoType) {
     const animTick = state.animTick;
     const pulse = 0.8 + Math.sin(animTick * 0.08 + tx * 3) * 0.2;
     ctx.save();
-    ctx.shadowColor = '#06b6d4';
-    ctx.shadowBlur = 10 * pulse * zoom;
-
     ctx.fillStyle = '#22d3ee';
     ctx.beginPath();
     ctx.moveTo(x, y - 24 * zoom);
@@ -1282,12 +1384,9 @@ function drawEnvironmentProp(ctx, tx, ty, decoType) {
     const blink = Math.sin(state.animTick * 0.12) > 0;
     if (blink) {
       ctx.fillStyle = '#fde047';
-      ctx.shadowColor = '#fde047';
-      ctx.shadowBlur = 8 * zoom;
       ctx.beginPath();
       ctx.arc(x, by - 14 * zoom, 2.5 * zoom, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
   } else if (decoType === 'boat') {
     // 25. Wooden Rowboat Bobbing on Water
@@ -2012,12 +2111,15 @@ function drawChibiTeamAvatar(ctx, team, isTurn) {
     ctx.fill();
   }
 
-  // Shadow (scales with hop height)
+  // Shadow (scales with hop height) - Flat transparent ellipse optimization
   const shadowScale = Math.max(0.55, 1 - (team.hopZ || 0) / 45);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = 'black';
   ctx.beginPath();
   ctx.ellipse(x, y + 2 * zoom, 14 * zoom * shadowScale, 7 * zoom * shadowScale, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
 
   // Character body with squash & stretch
   ctx.translate(x, y - jumpOffset + breathBob);
@@ -2110,12 +2212,10 @@ function drawSafeZoneBoundaryRing(ctx) {
   ctx.ellipse(centerScreen.x, centerScreen.y, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Outer glowing cyan ring
+  // Outer cyan ring (optimized without expensive shadowBlur)
   ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(34, 211, 238, 0.65)';
+  ctx.strokeStyle = 'rgba(34, 211, 238, 0.75)';
   ctx.lineWidth = 2.5 * zoom;
-  ctx.shadowColor = '#22d3ee';
-  ctx.shadowBlur = 14;
   ctx.beginPath();
   ctx.ellipse(centerScreen.x, centerScreen.y, rx * 1.42, ry * 1.42, 0, 0, Math.PI * 2);
   ctx.stroke();
@@ -2431,10 +2531,8 @@ function drawShowcaseStage(canvas, avatarType, teamColor, animTick = 0) {
   sCtx.rect(stageCenterX - podiumW, stageCenterY, podiumW * 2, podiumDepth);
   sCtx.fill();
 
-  // Glowing neon rim line
+  // Neon rim line (optimized without shadowBlur)
   sCtx.save();
-  sCtx.shadowColor = teamColor || '#06b6d4';
-  sCtx.shadowBlur = 18;
   sCtx.strokeStyle = teamColor || '#06b6d4';
   sCtx.lineWidth = 3.5;
   sCtx.beginPath();
@@ -2555,6 +2653,8 @@ window.MapRenderer = {
   BLOCK_DEPTH,
   tileToScreen,
   screenToTile,
+  invalidateBackground,
+  drawStaticBackground,
   drawIsometricTileBlock,
   drawTacticalMoveHighlight,
   drawEnvironmentProp,

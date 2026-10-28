@@ -11,35 +11,211 @@
 // ----------------------------------------------------------------------------
 // 1. ASSET HOOKS (SPRITES & SFX SYSTEM - READY FOR EXTENSION)
 // ----------------------------------------------------------------------------
-const AudioManager = {
-  enabled: true,
-  sounds: {
-    click: null,
-    move: null,
-    correct: null,
-    wrong: null,
-    airdrop: null,
-    shrink: null,
-    clash: null,
-    victory: null
+const audioManager = {
+  muted: false,
+  bgmVolume: 0.3,
+  sfxVolume: 1.0,
+  currentBGMKey: null,
+  currentBGM: null,
+  bgmElements: {},
+  sfxElements: {},
+  aliasMap: {
+    clash: 'attack',
+    shrink: 'zone',
+    move: 'click'
   },
-  setMuted(muted) {
-    this.enabled = !muted;
+
+  init() {
+    // Load persisted settings
+    const savedMuted = localStorage.getItem('lzb_audio_muted');
+    if (savedMuted !== null) {
+      this.muted = savedMuted === 'true';
+    }
+    const savedBGM = localStorage.getItem('lzb_bgm_volume');
+    if (savedBGM !== null) {
+      const parsed = parseFloat(savedBGM);
+      if (!isNaN(parsed)) this.bgmVolume = Math.max(0, Math.min(1, parsed));
+    }
+    const savedSFX = localStorage.getItem('lzb_sfx_volume');
+    if (savedSFX !== null) {
+      const parsed = parseFloat(savedSFX);
+      if (!isNaN(parsed)) this.sfxVolume = Math.max(0, Math.min(1, parsed));
+    }
+
+    // Load BGM elements
+    const bgmFiles = {
+      lobby: 'assets/audio/bgm_lobby.mp3',
+      combat: 'assets/audio/bgm_combat.mp3',
+      victory: 'assets/audio/bgm_victory.mp3'
+    };
+    for (const [key, path] of Object.entries(bgmFiles)) {
+      const audio = new Audio(path);
+      audio.loop = true;
+      audio.volume = this.muted ? 0 : this.bgmVolume;
+      audio.preload = 'auto';
+      // Continuous loop fallback listener
+      audio.addEventListener('ended', () => {
+        if (this.currentBGMKey === key && !this.muted) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        }
+      });
+      this.bgmElements[key] = audio;
+    }
+
+    // Load SFX elements
+    const sfxFiles = {
+      click: 'assets/audio/sfx_click.mp3',
+      correct: 'assets/audio/sfx_correct.mp3',
+      wrong: 'assets/audio/sfx_wrong.mp3',
+      attack: 'assets/audio/sfx_attack.mp3',
+      airdrop: 'assets/audio/sfx_airdrop.mp3',
+      zone: 'assets/audio/sfx_zone.mp3'
+    };
+    for (const [key, path] of Object.entries(sfxFiles)) {
+      const audio = new Audio(path);
+      audio.preload = 'auto';
+      audio.volume = this.muted ? 0 : this.sfxVolume;
+      this.sfxElements[key] = audio;
+    }
+
+    this.updateMuteUI();
   },
-  play(soundKey) {
-    if (!this.enabled || !this.sounds[soundKey]) return;
-    try {
-      this.sounds[soundKey].currentTime = 0;
-      this.sounds[soundKey].play().catch(() => {});
-    } catch (e) {
-      // Audio playback might be restricted before user gesture
+
+  playBGM(key) {
+    if (!this.bgmElements[key]) return;
+
+    // If already playing this BGM, ensure volume and playback
+    if (this.currentBGMKey === key && this.currentBGM) {
+      this.currentBGM.volume = this.muted ? 0 : this.bgmVolume;
+      if (!this.muted && this.currentBGM.paused) {
+        this.currentBGM.play().catch(() => {});
+      }
+      return;
+    }
+
+    // Stop current BGM
+    this.stopBGM();
+
+    this.currentBGMKey = key;
+    this.currentBGM = this.bgmElements[key];
+    this.currentBGM.loop = true;
+    this.currentBGM.volume = this.muted ? 0 : this.bgmVolume;
+
+    if (!this.muted) {
+      this.currentBGM.currentTime = 0;
+      this.currentBGM.play().catch(e => {
+        console.warn(`[Audio] Autoplay blocked for ${key} BGM, waiting for user gesture:`, e);
+      });
     }
   },
-  init() {
-    // Placeholder to register external audio files:
-    // this.sounds.click = new Audio('assets/sfx/click.mp3');
+
+  stopBGM() {
+    if (this.currentBGM) {
+      try {
+        this.currentBGM.pause();
+        this.currentBGM.currentTime = 0;
+      } catch (e) {}
+    }
+    this.currentBGM = null;
+    this.currentBGMKey = null;
+  },
+
+  playSFX(key) {
+    if (this.muted) return;
+    const realKey = this.aliasMap[key] || key;
+    if (realKey === 'victory') {
+      this.playBGM('victory');
+      return;
+    }
+    const audio = this.sfxElements[realKey];
+    if (audio) {
+      try {
+        audio.volume = this.sfxVolume;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } catch (e) {}
+    }
+  },
+
+  // Alias for backward compatibility with existing code
+  play(key) {
+    this.playSFX(key);
+  },
+
+  setMuted(muted) {
+    this.muted = !!muted;
+    localStorage.setItem('lzb_audio_muted', this.muted ? 'true' : 'false');
+
+    if (this.currentBGM) {
+      if (this.muted) {
+        this.currentBGM.pause();
+      } else {
+        this.currentBGM.volume = this.bgmVolume;
+        this.currentBGM.play().catch(() => {});
+      }
+    }
+    this.updateMuteUI();
+  },
+
+  setBGMVolume(vol) {
+    const val = Math.max(0, Math.min(1, parseFloat(vol)));
+    this.bgmVolume = val;
+    localStorage.setItem('lzb_bgm_volume', val.toString());
+    if (this.currentBGM && !this.muted) {
+      this.currentBGM.volume = val;
+    }
+  },
+
+  setSFXVolume(vol) {
+    const val = Math.max(0, Math.min(1, parseFloat(vol)));
+    this.sfxVolume = val;
+    localStorage.setItem('lzb_sfx_volume', val.toString());
+  },
+
+  updateMuteUI() {
+    const isMuted = this.muted;
+    // Header Icon & Label
+    const headerIcon = document.getElementById('header-audio-icon');
+    if (headerIcon) {
+      headerIcon.className = isMuted 
+        ? 'fa-solid fa-volume-xmark text-rose-400 text-sm sm:text-base' 
+        : 'fa-solid fa-volume-high text-cyan-300 text-sm sm:text-base';
+    }
+    const headerLabel = document.getElementById('header-audio-label');
+    if (headerLabel) {
+      headerLabel.textContent = isMuted ? 'Muted' : 'Audio';
+    }
+
+    // Lobby Icon
+    const lobbyIcon = document.getElementById('lobby-audio-icon');
+    if (lobbyIcon) {
+      lobbyIcon.className = isMuted 
+        ? 'fa-solid fa-volume-xmark text-rose-400 text-sm sm:text-base' 
+        : 'fa-solid fa-volume-high text-cyan-300 text-sm sm:text-base';
+    }
+
+    // Settings Modal UI
+    const settingsMuteIcon = document.getElementById('settings-mute-icon');
+    if (settingsMuteIcon) {
+      settingsMuteIcon.className = isMuted 
+        ? 'fa-solid fa-volume-xmark text-rose-400 text-sm' 
+        : 'fa-solid fa-volume-high text-cyan-400 text-sm';
+    }
+    const settingsMuteBtn = document.getElementById('settings-mute-btn');
+    if (settingsMuteBtn) {
+      settingsMuteBtn.textContent = isMuted ? 'UNMUTE' : 'MUTE';
+      settingsMuteBtn.className = isMuted
+        ? 'px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 text-xs font-bold transition active:scale-95 cursor-pointer'
+        : 'px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/20 text-xs font-bold transition active:scale-95 cursor-pointer';
+    }
   }
 };
+
+// Aliases & Global Exposure
+const AudioManager = audioManager;
+window.audioManager = audioManager;
+window.AudioManager = audioManager;
 
 const SpriteManager = {
   loaded: false,
@@ -289,6 +465,7 @@ window.GameEngine = {
       isInputLocked
     };
   },
+  getTileAt: getTileAt,
   AudioManager,
   SpriteManager
 };
@@ -879,48 +1056,40 @@ function getReachableTiles(team) {
 }
 
 // ----------------------------------------------------------------------------
-// 7. MAIN ARENA RENDER LOOP
+// 7. MAIN ARENA RENDER LOOP (THROTTLED AT 30 FPS + PRE-RENDERED BACKGROUND)
 // ----------------------------------------------------------------------------
-function renderArena() {
-  const MR = window.MapRenderer;
-  if (!MR) {
-    requestAnimationFrame(renderArena);
+let lastRenderTime = 0;
+const TARGET_FPS = 30;
+const FRAME_INTERVAL_MS = 1000 / TARGET_FPS; // ~33.33ms
+
+function renderArena(currentTime = 0) {
+  requestAnimationFrame(renderArena);
+
+  // Skip frame if not on gameplay screen (saves 100% CPU when in Lobby, Prep, or End screen)
+  const gameView = document.getElementById('view-game');
+  if (!gameView || gameView.classList.contains('hidden')) {
     return;
   }
 
-  animTick++;
-  ctx.clearRect(0, 0, isoCanvas.width, isoCanvas.height);
+  // Frame limiter: Throttle to maximum 30 FPS
+  const elapsed = currentTime - lastRenderTime;
+  if (elapsed < FRAME_INTERVAL_MS) {
+    return;
+  }
+  lastRenderTime = currentTime - (elapsed % FRAME_INTERVAL_MS);
 
-  const grad = ctx.createRadialGradient(
-    isoCanvas.width / 2, isoCanvas.height / 2, 80,
-    isoCanvas.width / 2, isoCanvas.height / 2, isoCanvas.width * 0.75
-  );
-  grad.addColorStop(0, '#1e3a5f');
-  grad.addColorStop(0.65, '#172554');
-  grad.addColorStop(1, '#2e1065');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, isoCanvas.width, isoCanvas.height);
+  const MR = window.MapRenderer;
+  if (!MR) return;
+
+  animTick++;
+
+  // 1. Draw pre-rendered static background (Offscreen canvas blit!)
+  // Draws all tiles, grid, water, and static environment props in ONE single GPU drawImage call!
+  MR.drawStaticBackground(ctx);
 
   const currentTeam = teams[activeTeamIndex];
 
-  const minCoord = -OUTFIELD_MARGIN;
-  const maxCoord = mapSize + OUTFIELD_MARGIN - 1;
-  const minSum = minCoord * 2;
-  const maxSum = maxCoord * 2;
-
-  for (let sum = minSum; sum <= maxSum; sum++) {
-    for (let x = minCoord; x <= maxCoord; x++) {
-      const y = sum - x;
-      if (y >= minCoord && y <= maxCoord) {
-        const tile = getTileAt(x, y);
-        if (tile) {
-          MR.drawIsometricTileBlock(ctx, x, y, tile);
-        }
-      }
-    }
-  }
-
-  // Tactical Movement Highlights for Current Active Team (1 MP and 2 MP Reachable Tiles)
+  // 2. Tactical Movement Highlights for Current Active Team (1 MP and 2 MP Reachable Tiles)
   if (currentTeam && currentTeam.alive && currentTeam.mp > 0 && !currentTeam.isMoving && !hasMovedThisTurn && !currentTeam.isFrozen) {
     const reachable = getReachableTiles(currentTeam);
     reachable.forEach(t => {
@@ -928,16 +1097,8 @@ function renderArena() {
     });
   }
 
+  // 3. Dynamic entities (Airdrops & Chibi Avatars)
   const renderables = [];
-  for (let y = minCoord; y <= maxCoord; y++) {
-    for (let x = minCoord; x <= maxCoord; x++) {
-      const tile = getTileAt(x, y);
-      if (tile && tile.deco) {
-        renderables.push({ depth: x + y, type: 'prop', x, y, deco: tile.deco });
-      }
-    }
-  }
-
   airdrops.forEach(ad => {
     renderables.push({ depth: ad.x + ad.y + 0.1, type: 'airdrop', x: ad.x, y: ad.y });
   });
@@ -950,18 +1111,16 @@ function renderArena() {
 
   renderables.sort((a, b) => a.depth - b.depth);
   renderables.forEach(item => {
-    if (item.type === 'prop') MR.drawEnvironmentProp(ctx, item.x, item.y, item.deco);
-    else if (item.type === 'airdrop') MR.drawAirdropCrate(ctx, item.x, item.y);
+    if (item.type === 'airdrop') MR.drawAirdropCrate(ctx, item.x, item.y);
     else if (item.type === 'avatar') MR.drawChibiTeamAvatar(ctx, item.team, item.isTurn);
   });
 
+  // 4. Floating texts, Safe Zone Ring & Atmospheric clouds
   MR.updateAndDrawParticlesAndFloatingText(ctx);
   MR.drawSafeZoneBoundaryRing(ctx);
   if (typeof MR.drawAtmosphericClouds === 'function') {
     MR.drawAtmosphericClouds(ctx);
   }
-
-  requestAnimationFrame(renderArena);
 }
 
 // ----------------------------------------------------------------------------
@@ -1241,10 +1400,34 @@ window.addEventListener('mousemove', e => {
   if (isDragging) {
     camX = e.clientX - dragStartX;
     camY = e.clientY - dragStartY;
+    if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+      window.MapRenderer.invalidateBackground();
+    }
   }
 });
 
 window.addEventListener('mouseup', () => { isDragging = false; });
+
+// Touch Drag Support for Smart TV / Interactive Whiteboards
+isoCanvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragStartX = e.touches[0].clientX - camX;
+    dragStartY = e.touches[0].clientY - camY;
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', e => {
+  if (isDragging && e.touches.length === 1) {
+    camX = e.touches[0].clientX - dragStartX;
+    camY = e.touches[0].clientY - dragStartY;
+    if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+      window.MapRenderer.invalidateBackground();
+    }
+  }
+}, { passive: true });
+
+window.addEventListener('touchend', () => { isDragging = false; });
 
 isoCanvas.addEventListener('click', e => {
   const MR = window.MapRenderer;
@@ -1262,6 +1445,9 @@ isoCanvas.addEventListener('click', e => {
   hasMovedThisTurn = true;
   if (mapGrid[destY][destX].deco === 'bush') {
     mapGrid[destY][destX].deco = null;
+    if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+      window.MapRenderer.invalidateBackground();
+    }
   }
   renderHUD();
 
@@ -1369,6 +1555,9 @@ function triggerQuestionModal(team, mode) {
   }
 
   modal.classList.remove('hidden');
+  if (mode === 'airdrop') {
+    audioManager.play('airdrop');
+  }
 }
 
 function selectQuestionOption(selectedIdx, correctIdx, mode) {
@@ -1642,6 +1831,11 @@ function triggerChallengeModal(team1, team2, options = {}) {
 
   modal.classList.remove('hidden');
   startDuelStageLoop(team1, team2);
+  if (isAirdropClash) {
+    audioManager.play('airdrop');
+  } else {
+    audioManager.play('attack');
+  }
 }
 
 function startChallengeBattle() {
@@ -2264,6 +2458,7 @@ function closeItemGuideModal() {
 function useActiveTeamItem() {
   const activeTeam = teams[activeTeamIndex];
   if (!activeTeam || !activeTeam.item) return;
+  audioManager.play('click');
 
   const itemKey = activeTeam.item;
   const itemDef = TACTICAL_ITEMS[itemKey];
@@ -2416,13 +2611,13 @@ function executeTargetAction(targetId, actionType) {
     if (target.hasArmor) {
       target.hasArmor = false; // Armor absorbs hit completely and breaks!
       if (MR) MR.spawnFloatingText(target.x, target.y, '🛡️ ARMOR MENAHAN AWM! (PECAH)', '#34d399');
-      AudioManager.play('wrong');
+      audioManager.play('attack');
     } else {
       target.lp = Math.max(0, target.lp - 20);
       target.isHurt = true;
       setTimeout(() => { target.isHurt = false; }, 2200);
       if (MR) MR.spawnFloatingText(target.x, target.y, '🎯 AWM STRIKE! -20 LP', '#f43f5e');
-      AudioManager.play('wrong');
+      audioManager.play('attack');
       if (target.lp === 0) {
         target.alive = false;
         activeTeam.kills += 1;
@@ -2509,6 +2704,9 @@ function executeEndGame() {
 // ----------------------------------------------------------------------------
 function zoomMap(factor) {
   zoom = Math.min(2.2, Math.max(0.45, zoom * factor));
+  if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+    window.MapRenderer.invalidateBackground();
+  }
 }
 
 function resetCamera() {
@@ -2523,10 +2721,16 @@ function resetCamera() {
     zoom = 1.15;
     camY = isoCanvas.height * 0.18;
   }
+  if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+    window.MapRenderer.invalidateBackground();
+  }
 }
 
 function toggleCoordLabels() {
   showCoords = !showCoords;
+  if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+    window.MapRenderer.invalidateBackground();
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -2584,6 +2788,7 @@ async function verifyLicense() {
 
     if (data && data.valid === true) {
       localStorage.setItem('lzb_license_active', 'true');
+      audioManager.playBGM('lobby');
 
       const successMsg = data.pesan || data.message || 'AKSES DITERIMA. MEMBUAT SESI PERMAINAN...';
       if (feedback) {
@@ -2679,6 +2884,17 @@ function switchView(view) {
     activeTab.classList.add('bg-cyan-500', 'text-slate-950');
   }
 
+  // Handle BGM Transitions
+  if (view === 'prep' || view === 'drop') {
+    audioManager.playBGM('lobby');
+  } else if (view === 'game') {
+    audioManager.playBGM('combat');
+  } else if (view === 'end') {
+    audioManager.playBGM('victory');
+  } else if (view === 'login') {
+    audioManager.stopBGM();
+  }
+
   if (view === 'drop') drawDropRadar();
   if (view === 'game') {
     resizeIsoCanvas();
@@ -2688,7 +2904,6 @@ function switchView(view) {
   }
   if (view === 'end') {
     renderEndStandings();
-    AudioManager.play('victory');
   }
 }
 
@@ -3479,29 +3694,76 @@ function toggleLobbyNavMenu() {
   AudioManager.play('click');
 }
 
-let isAudioMuted = false;
 function toggleAudioMute() {
-  isAudioMuted = !isAudioMuted;
-  const icon = document.getElementById('lobby-audio-icon');
-  if (icon) {
-    icon.className = isAudioMuted ? 'fa-solid fa-volume-xmark text-rose-400' : 'fa-solid fa-volume-high text-cyan-300';
+  audioManager.setMuted(!audioManager.muted);
+}
+
+function openAudioSettingsModal() {
+  const modal = document.getElementById('modal-audio-settings');
+  if (!modal) return;
+
+  const bgmSlider = document.getElementById('bgm-vol-slider');
+  const bgmVal = document.getElementById('bgm-vol-val');
+  if (bgmSlider && bgmVal) {
+    const bgmPercent = Math.round(audioManager.bgmVolume * 100);
+    bgmSlider.value = bgmPercent;
+    bgmVal.textContent = `${bgmPercent}%`;
   }
-  const headerIcon = document.getElementById('header-audio-icon');
-  if (headerIcon) {
-    headerIcon.className = isAudioMuted ? 'fa-solid fa-volume-xmark text-rose-400 text-xs' : 'fa-solid fa-volume-high text-purple-300 text-xs';
+
+  const sfxSlider = document.getElementById('sfx-vol-slider');
+  const sfxVal = document.getElementById('sfx-vol-val');
+  if (sfxSlider && sfxVal) {
+    const sfxPercent = Math.round(audioManager.sfxVolume * 100);
+    sfxSlider.value = sfxPercent;
+    sfxVal.textContent = `${sfxPercent}%`;
   }
-  AudioManager.setMuted(isAudioMuted);
+
+  audioManager.updateMuteUI();
+  modal.classList.remove('hidden');
+  audioManager.play('click');
+}
+
+function closeAudioSettingsModal() {
+  const modal = document.getElementById('modal-audio-settings');
+  if (modal) modal.classList.add('hidden');
+  audioManager.play('click');
+}
+
+function onBGMVolumeSliderChange(val) {
+  const floatVal = parseInt(val, 10) / 100;
+  audioManager.setBGMVolume(floatVal);
+  const display = document.getElementById('bgm-vol-val');
+  if (display) display.textContent = `${val}%`;
+}
+
+function onSFXVolumeSliderChange(val) {
+  const floatVal = parseInt(val, 10) / 100;
+  audioManager.setSFXVolume(floatVal);
+  const display = document.getElementById('sfx-vol-val');
+  if (display) display.textContent = `${val}%`;
+}
+
+function testSFXSound() {
+  audioManager.play('correct');
 }
 
 // ----------------------------------------------------------------------------
 // 15C. LOBBY PARTICLES & LIVE CHIBI IDLE ANIMATIONS
 // ----------------------------------------------------------------------------
 let lobbyAnimTick = 0;
-function runLobbyChibiAnimLoop() {
-  lobbyAnimTick++;
+let lastLobbyAnimTime = 0;
+function runLobbyChibiAnimLoop(now = 0) {
+  requestAnimationFrame(runLobbyChibiAnimLoop);
+
   const prepView = document.getElementById('view-prep');
+  if (!prepView || prepView.classList.contains('hidden')) return;
+
+  if (now - lastLobbyAnimTime < 33) return; // 30 FPS throttle
+  lastLobbyAnimTime = now;
+
+  lobbyAnimTick++;
   const MR = window.MapRenderer;
-  if (prepView && !prepView.classList.contains('hidden') && MR && MR.drawChibiThumbnail) {
+  if (MR && MR.drawChibiThumbnail) {
     teams.forEach((t, idx) => {
       const canvas = document.getElementById(`team-chibi-canvas-${idx}`);
       if (canvas) {
@@ -3509,7 +3771,6 @@ function runLobbyChibiAnimLoop() {
       }
     });
   }
-  requestAnimationFrame(runLobbyChibiAnimLoop);
 }
 
 let lobbyParticles = [];
@@ -3540,30 +3801,32 @@ function initLobbyParticles() {
     });
   }
 
-  function renderParticles() {
-    const prepView = document.getElementById('view-prep');
-    if (prepView && !prepView.classList.contains('hidden')) {
-      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-      for (let p of lobbyParticles) {
-        p.x += p.speedX;
-        p.y += p.speedY;
-        if (p.y < -10) {
-          p.y = pCanvas.height + 10;
-          p.x = Math.random() * pCanvas.width;
-        }
-        if (p.x < -10) p.x = pCanvas.width + 10;
-        if (p.x > pCanvas.width + 10) p.x = -10;
-
-        pCtx.beginPath();
-        pCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        pCtx.fillStyle = p.color + p.alpha + ')';
-        pCtx.shadowBlur = 8;
-        pCtx.shadowColor = p.color + '1)';
-        pCtx.fill();
-        pCtx.shadowBlur = 0;
-      }
-    }
+  let lastParticleTime = 0;
+  function renderParticles(now = 0) {
     requestAnimationFrame(renderParticles);
+
+    const prepView = document.getElementById('view-prep');
+    if (!prepView || prepView.classList.contains('hidden')) return;
+
+    if (now - lastParticleTime < 33) return; // 30 FPS throttle
+    lastParticleTime = now;
+
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    for (let p of lobbyParticles) {
+      p.x += p.speedX;
+      p.y += p.speedY;
+      if (p.y < -10) {
+        p.y = pCanvas.height + 10;
+        p.x = Math.random() * pCanvas.width;
+      }
+      if (p.x < -10) p.x = pCanvas.width + 10;
+      if (p.x > pCanvas.width + 10) p.x = -10;
+
+      pCtx.beginPath();
+      pCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      pCtx.fillStyle = p.color + p.alpha + ')';
+      pCtx.fill();
+    }
   }
   requestAnimationFrame(renderParticles);
 }
@@ -3991,8 +4254,6 @@ function drawDropRadar() {
   dCtx.setLineDash([7, 5]);
   dCtx.strokeStyle = '#22c55e';
   dCtx.lineWidth = 2.5;
-  dCtx.shadowColor = 'rgba(34, 197, 94, 0.85)';
-  dCtx.shadowBlur = 8;
   dCtx.strokeRect(sx, sy, sw, sh);
   dCtx.restore();
 
@@ -4001,8 +4262,6 @@ function drawDropRadar() {
   dCtx.setLineDash([8, 6]);
   dCtx.strokeStyle = '#facc15';
   dCtx.lineWidth = 2.2;
-  dCtx.shadowColor = 'rgba(250, 204, 21, 0.85)';
-  dCtx.shadowBlur = 6;
 
   const startX = flightPath.start.normX * w;
   const startY = flightPath.start.normY * h;
@@ -4023,8 +4282,6 @@ function drawDropRadar() {
   dCtx.translate(px, py);
   dCtx.rotate(angle);
   dCtx.fillStyle = '#fef08a';
-  dCtx.shadowColor = '#facc15';
-  dCtx.shadowBlur = 10;
   dCtx.beginPath();
   dCtx.moveTo(11, 0);
   dCtx.lineTo(-9, -10);
@@ -4080,12 +4337,9 @@ function drawDropRadar() {
     if (isSelected) {
       dCtx.strokeStyle = '#22d3ee';
       dCtx.lineWidth = 2;
-      dCtx.shadowColor = '#22d3ee';
-      dCtx.shadowBlur = 12;
       dCtx.beginPath();
       dCtx.arc(tx, ty, Math.max(14, cell * 0.7), 0, Math.PI * 2);
       dCtx.stroke();
-      dCtx.shadowBlur = 0;
     }
 
     // Pin shadow
@@ -4282,8 +4536,18 @@ function exportResultsExcel() {
 // 18. CANVAS RESIZE & INIT
 // ----------------------------------------------------------------------------
 function resizeIsoCanvas() {
-  isoCanvas.width = window.innerWidth;
-  isoCanvas.height = window.innerHeight - 48;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.0); // Pixel ratio capped at 1.0 for Smart TVs!
+  const displayW = window.innerWidth;
+  const displayH = window.innerHeight - 48;
+
+  isoCanvas.width = Math.floor(displayW * dpr);
+  isoCanvas.height = Math.floor(displayH * dpr);
+  isoCanvas.style.width = '100%';
+  isoCanvas.style.height = `${displayH}px`;
+
+  if (window.MapRenderer && window.MapRenderer.invalidateBackground) {
+    window.MapRenderer.invalidateBackground();
+  }
 }
 
 window.addEventListener('resize', resizeIsoCanvas);
@@ -4383,10 +4647,39 @@ window.openEndGameConfirmModal = openEndGameConfirmModal;
 window.closeEndGameConfirmModal = closeEndGameConfirmModal;
 window.executeEndGame = executeEndGame;
 
+// Audio Settings & Manager Exports
+window.audioManager = audioManager;
+window.AudioManager = audioManager;
+window.toggleAudioMute = toggleAudioMute;
+window.openAudioSettingsModal = openAudioSettingsModal;
+window.closeAudioSettingsModal = closeAudioSettingsModal;
+window.onBGMVolumeSliderChange = onBGMVolumeSliderChange;
+window.onSFXVolumeSliderChange = onSFXVolumeSliderChange;
+window.testSFXSound = testSFXSound;
+
 // Authentication & Digital Lock Exports
 window.initAuthCheck = initAuthCheck;
 window.verifyLicense = verifyLicense;
 window.resetLicense = resetLicense;
+
+// Autoplay bypass on first user gesture (for reloads when license is already active)
+const unlockAudioOnFirstGesture = () => {
+  if (isLicenseActive() && (!audioManager.currentBGMKey || audioManager.currentBGM?.paused)) {
+    const curEnd = document.getElementById('view-end');
+    const curGame = document.getElementById('view-game');
+    if (curEnd && !curEnd.classList.contains('hidden')) {
+      audioManager.playBGM('victory');
+    } else if (curGame && !curGame.classList.contains('hidden')) {
+      audioManager.playBGM('combat');
+    } else {
+      audioManager.playBGM('lobby');
+    }
+  }
+  document.removeEventListener('click', unlockAudioOnFirstGesture);
+  document.removeEventListener('touchstart', unlockAudioOnFirstGesture);
+};
+document.addEventListener('click', unlockAudioOnFirstGesture, { once: true });
+document.addEventListener('touchstart', unlockAudioOnFirstGesture, { once: true });
 
 // Initialize Game
 AudioManager.init();

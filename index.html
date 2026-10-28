@@ -29,10 +29,16 @@
       </span>
     </div>
 
-    <div class="flex items-center gap-2">
-      <button onclick="toggleAudioMute()" id="header-audio-btn" title="Audio Game ON/OFF" class="px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-purple-500/20 text-purple-300 border border-purple-400/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow cursor-pointer">
-        <i id="header-audio-icon" class="fa-solid fa-volume-high text-xs"></i>
-        <span class="hidden sm:inline">Audio</span>
+    <div class="flex items-center gap-2 sm:gap-2.5">
+      <!-- Mute Toggle Button (Touch Friendly) -->
+      <button onclick="toggleAudioMute()" id="header-audio-btn" title="Mute / Unmute Audio" class="h-9 sm:h-10 px-3 sm:px-3.5 rounded-xl bg-slate-900/90 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-xs sm:text-sm font-bold flex items-center gap-2 transition active:scale-95 shadow cursor-pointer">
+        <i id="header-audio-icon" class="fa-solid fa-volume-high text-sm sm:text-base"></i>
+        <span id="header-audio-label" class="hidden sm:inline">Audio</span>
+      </button>
+
+      <!-- Audio Options Button (Logo Option Saja, Touch Friendly) -->
+      <button onclick="openAudioSettingsModal()" id="header-audio-options-btn" title="Pengaturan Volume Audio" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/90 hover:bg-purple-500/20 text-purple-300 border border-purple-400/40 flex items-center justify-center text-sm sm:text-base transition active:scale-95 shadow cursor-pointer">
+        <i class="fa-solid fa-sliders"></i>
       </button>
     </div>
   </header>
@@ -214,8 +220,11 @@
       
       <!-- Top Left Cyber Action Buttons -->
       <div class="flex items-center gap-2">
-        <button onclick="toggleAudioMute()" id="lobby-audio-btn" title="Audio Game ON/OFF" class="w-9 h-9 rounded-xl bg-slate-900/80 hover:bg-purple-500/20 text-purple-300 border border-purple-400/40 flex items-center justify-center transition shadow-lg active:scale-95 cursor-pointer">
-          <i id="lobby-audio-icon" class="fa-solid fa-volume-high text-xs"></i>
+        <button onclick="toggleAudioMute()" id="lobby-audio-btn" title="Audio Game ON/OFF" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/80 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center transition shadow-lg active:scale-95 cursor-pointer">
+          <i id="lobby-audio-icon" class="fa-solid fa-volume-high text-sm sm:text-base"></i>
+        </button>
+        <button onclick="openAudioSettingsModal()" id="lobby-audio-options-btn" title="Pengaturan Volume Audio" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/80 hover:bg-purple-500/20 text-purple-300 border border-purple-400/40 flex items-center justify-center transition shadow-lg active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-sliders text-sm sm:text-base"></i>
         </button>
       </div>
 
@@ -1664,6 +1673,105 @@
           <i class="fa-solid fa-check mr-1.5"></i> YES (SELESAI)
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL 11: PENGATURAN VOLUME AUDIO (BGM & SFX) -->
+  <div id="modal-audio-settings" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fadeIn">
+    <div class="glass-modal max-w-md w-full rounded-3xl p-5 sm:p-6 space-y-5 border-2 border-cyan-400/50 shadow-[0_0_50px_rgba(6,182,212,0.25)] relative animate-pop my-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/30 border border-cyan-400/50 flex items-center justify-center text-cyan-300 text-lg shadow-md">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <div>
+            <h3 class="font-game text-base sm:text-lg text-white font-bold leading-tight">PENGATURAN AUDIO</h3>
+            <p class="text-[11px] text-slate-400">Atur volume BGM &amp; Efek Suara (SFX)</p>
+          </div>
+        </div>
+        <button onclick="closeAudioSettingsModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Controls Container -->
+      <div class="space-y-4">
+        
+        <!-- BGM Volume Slider -->
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-purple-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-music text-purple-400 text-sm"></i>
+              <span class="text-xs font-bold text-purple-200 tracking-wider uppercase">Volume Musik (BGM)</span>
+            </div>
+            <span id="bgm-vol-val" class="font-mono font-bold text-xs text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-md border border-purple-400/30">30%</span>
+          </div>
+          <input 
+            type="range" 
+            id="bgm-vol-slider" 
+            min="0" 
+            max="100" 
+            value="30" 
+            oninput="onBGMVolumeSliderChange(this.value)" 
+            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-400"
+          />
+          <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        <!-- SFX Volume Slider -->
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-volume-high text-cyan-400 text-sm"></i>
+              <span class="text-xs font-bold text-cyan-200 tracking-wider uppercase">Volume Efek (SFX)</span>
+            </div>
+            <span id="sfx-vol-val" class="font-mono font-bold text-xs text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded-md border border-cyan-400/30">100%</span>
+          </div>
+          <input 
+            type="range" 
+            id="sfx-vol-slider" 
+            min="0" 
+            max="100" 
+            value="100" 
+            oninput="onSFXVolumeSliderChange(this.value)" 
+            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+          />
+          <div class="flex justify-between items-center pt-1">
+            <span class="text-[10px] text-slate-500 font-mono">0% - 100%</span>
+            <button onclick="testSFXSound()" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-[11px] font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer">
+              <i class="fa-solid fa-play text-[9px]"></i> Tes SFX
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Mute Toggle -->
+        <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <i id="settings-mute-icon" class="fa-solid fa-volume-high text-cyan-400 text-sm"></i>
+            <span class="text-xs font-bold text-slate-200">Mode Senyap (Mute Semua)</span>
+          </div>
+          <button 
+            id="settings-mute-btn" 
+            onclick="toggleAudioMute()" 
+            class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/20 text-xs font-bold transition active:scale-95 cursor-pointer"
+          >
+            MUTE
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Action Button -->
+      <button onclick="closeAudioSettingsModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-game font-bold text-xs sm:text-sm tracking-wider shadow-lg shadow-cyan-500/25 transition active:scale-95 cursor-pointer">
+        SIMPAN &amp; TUTUP
+      </button>
+
     </div>
   </div>
 
