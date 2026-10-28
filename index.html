@@ -617,14 +617,14 @@
           </button>
 
           <!-- B. TOKO DARURAT BUTTON -->
-          <button onclick="openShopModal()" title="Buka Toko Darurat (Tukar 150 Skor ➔ +1 MP)" class="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-game font-bold text-xs tracking-wide shadow-lg shadow-amber-400/25 transition active:scale-95 flex items-center justify-between group border border-amber-300/60">
+          <button onclick="openShopModal()" title="Buka Toko Darurat (Beli MP & LP)" class="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-game font-bold text-xs tracking-wide shadow-lg shadow-amber-400/25 transition active:scale-95 flex items-center justify-between group border border-amber-300/60">
             <div class="flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-lg bg-slate-950/20 flex items-center justify-center shrink-0 shadow-inner">
                 <i class="fa-solid fa-cart-shopping text-slate-950 text-xs"></i>
               </div>
               <div class="text-left">
                 <div class="leading-tight text-slate-950 font-black">TOKO DARURAT</div>
-                <div class="text-[9px] font-black text-amber-950">150 Skor ➔ +1 MP</div>
+                <div class="text-[9px] font-black text-amber-950">Tukar Skor ➔ MP &amp; LP (+40)</div>
               </div>
             </div>
             <i class="fa-solid fa-chevron-right text-[10px] text-amber-950 group-hover:translate-x-0.5 transition-transform"></i>
@@ -1353,11 +1353,11 @@
     </div>
   </div>
 
-  <!-- MODAL 6: TOKO DARURAT / EMERGENCY MARKET (TUKAR SKOR ➔ MP) -->
+  <!-- MODAL 6: TOKO DARURAT / EMERGENCY MARKET (TUKAR SKOR ➔ MP / LP) -->
   <div id="shop-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
-    <div class="glass-modal max-w-md w-full rounded-3xl p-5 md:p-6 space-y-4 border-2 border-amber-400/40 shadow-2xl relative animate-pop my-auto">
+    <div class="glass-modal max-w-lg w-full rounded-3xl p-5 md:p-6 space-y-4 border-2 border-amber-400/40 shadow-2xl relative animate-pop my-auto">
       <!-- Close Button -->
-      <button onclick="closeShopModal()" title="Tutup Toko" class="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition absolute top-4 right-4 z-20 border border-white/10 active:scale-95">
+      <button onclick="closeShopModal()" title="Tutup Toko" class="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition absolute top-4 right-4 z-20 border border-white/10 active:scale-95 cursor-pointer">
         <i class="fa-solid fa-xmark text-sm"></i>
       </button>
 
@@ -1368,35 +1368,64 @@
         <span id="shop-team-name" class="text-xs text-white font-bold">Team Alpha</span>
       </div>
 
-      <div class="rounded-2xl p-4 bg-slate-900/90 border border-white/10 space-y-2.5">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-slate-400">Skor Tim Saat Ini:</span>
-          <span id="shop-team-score" class="font-game text-base text-amber-400 font-bold">0 PTS</span>
+      <!-- Status Tim Grid (Score, MP, LP) -->
+      <div class="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-slate-900/90 border border-white/10 text-center">
+        <div>
+          <span class="text-[10px] text-slate-400 block font-semibold">Skor Tim</span>
+          <span id="shop-team-score" class="font-game text-sm sm:text-base text-amber-400 font-bold">0 PTS</span>
         </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-slate-400">Move Point (MP) Tim:</span>
-          <span id="shop-team-mp" class="font-game text-base text-cyan-300 font-bold">0 / 2 MP</span>
+        <div>
+          <span class="text-[10px] text-slate-400 block font-semibold">Move Point</span>
+          <span id="shop-team-mp" class="font-game text-sm sm:text-base text-cyan-300 font-bold">0 / 2 MP</span>
         </div>
-      </div>
-
-      <!-- Item Card: +1 MP Emergency Movement -->
-      <div class="rounded-2xl p-4 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-slate-900 border border-amber-400/30 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-400 text-amber-300 flex items-center justify-center text-xl shrink-0">
-            <i class="fa-solid fa-person-running"></i>
-          </div>
-          <div>
-            <div class="font-game text-sm text-white font-bold">+1 Move Point (MP)</div>
-            <div class="text-[11px] text-slate-300">Konversi darurat untuk bergerak di giliran ini</div>
-            <div class="text-[10.5px] text-amber-300 font-black mt-0.5">💰 BIAYA: 150 SKOR</div>
-          </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block font-semibold">Health (LP)</span>
+          <span id="shop-team-lp" class="font-game text-sm sm:text-base text-emerald-400 font-bold">100 / 100</span>
         </div>
       </div>
 
-      <div id="shop-error-msg" class="hidden text-xs text-rose-400 text-center font-semibold"></div>
+      <!-- Pilihan Item List -->
+      <div class="space-y-3">
+        
+        <!-- Item 1: +1 MP Emergency Movement -->
+        <div class="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900/90 border border-amber-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-400 text-amber-300 flex items-center justify-center text-xl shrink-0 shadow-md">
+              <i class="fa-solid fa-person-running"></i>
+            </div>
+            <div>
+              <div class="font-game text-sm text-white font-bold">+1 Move Point (MP)</div>
+              <div class="text-[11px] text-slate-300">Tambah 1 MP darurat untuk bergerak di giliran ini</div>
+              <div class="text-[10.5px] text-amber-300 font-black mt-0.5">💰 BIAYA: 150 SKOR</div>
+            </div>
+          </div>
+          <button id="shop-buy-mp-btn" onclick="buyEmergencyMP()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-game font-bold text-xs tracking-wider transition active:scale-95 shadow shrink-0 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-coins"></i> BELI (+1 MP)
+          </button>
+        </div>
 
-      <button id="shop-buy-btn" onclick="buyEmergencyMP()" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-game font-bold text-sm shadow-xl shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-2">
-        <i class="fa-solid fa-coins"></i> TUKAR 150 SKOR ➔ +1 MP
+        <!-- Item 2: First Aid Kit (+40 LP) -->
+        <div class="rounded-2xl p-3.5 bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900/90 border border-emerald-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-emerald-400/20 border border-emerald-400 text-emerald-300 flex items-center justify-center text-xl shrink-0 shadow-md">
+              <i class="fa-solid fa-kit-medical"></i>
+            </div>
+            <div>
+              <div class="font-game text-sm text-white font-bold">First Aid Kit (+40 LP)</div>
+              <div class="text-[11px] text-slate-300">Memulihkan 40 Life Point (LP) darah tim</div>
+              <div class="text-[10.5px] text-emerald-300 font-black mt-0.5">💰 BIAYA: 150 SKOR</div>
+            </div>
+          </div>
+          <button id="shop-buy-lp-btn" onclick="buyFirstAidKit()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-slate-950 font-game font-bold text-xs tracking-wider transition active:scale-95 shadow shrink-0 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-heart-pulse"></i> BELI (+40 LP)
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Tutup Button -->
+      <button onclick="closeShopModal()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-game font-bold text-xs tracking-wider transition active:scale-95 cursor-pointer">
+        TUTUP TOKO
       </button>
     </div>
   </div>
