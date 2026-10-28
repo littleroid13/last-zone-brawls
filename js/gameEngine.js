@@ -2119,27 +2119,51 @@ function openShopModal() {
   const currentTeam = teams[activeTeamIndex];
   if (!currentTeam) return;
 
-  document.getElementById('shop-team-name').textContent = currentTeam.name;
-  document.getElementById('shop-team-score').textContent = `${currentTeam.score.toLocaleString()} PTS`;
-  document.getElementById('shop-team-mp').textContent = `${currentTeam.mp} / ${currentTeam.maxMp} MP`;
+  const scoreEl = document.getElementById('shop-team-score');
+  const mpEl = document.getElementById('shop-team-mp');
+  const lpEl = document.getElementById('shop-team-lp');
+  const nameEl = document.getElementById('shop-team-name');
 
-  const errorEl = document.getElementById('shop-error-msg');
-  const buyBtn = document.getElementById('shop-buy-btn');
+  if (nameEl) nameEl.textContent = currentTeam.name;
+  if (scoreEl) scoreEl.textContent = `${currentTeam.score.toLocaleString()} PTS`;
+  if (mpEl) mpEl.textContent = `${currentTeam.mp} / ${currentTeam.maxMp} MP`;
+  if (lpEl) lpEl.textContent = `${currentTeam.lp} / 100 LP`;
 
-  if (currentTeam.mp >= currentTeam.maxMp) {
-    errorEl.textContent = `⚠️ Move Point sudah maksimal (${currentTeam.maxMp}/${currentTeam.maxMp} MP).`;
-    errorEl.classList.remove('hidden');
-    buyBtn.disabled = true;
-    buyBtn.classList.add('opacity-50', 'cursor-not-allowed');
-  } else if (currentTeam.score < 150) {
-    errorEl.textContent = `⚠️ Skor tidak mencukupi (Butuh 150 PTS, memiliki ${currentTeam.score} PTS).`;
-    errorEl.classList.remove('hidden');
-    buyBtn.disabled = true;
-    buyBtn.classList.add('opacity-50', 'cursor-not-allowed');
-  } else {
-    errorEl.classList.add('hidden');
-    buyBtn.disabled = false;
-    buyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  const buyMpBtn = document.getElementById('shop-buy-mp-btn');
+  const buyLpBtn = document.getElementById('shop-buy-lp-btn');
+
+  // Check MP purchase eligibility
+  if (buyMpBtn) {
+    if (currentTeam.mp >= currentTeam.maxMp) {
+      buyMpBtn.disabled = true;
+      buyMpBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-game font-bold text-xs tracking-wider cursor-not-allowed opacity-60';
+      buyMpBtn.innerHTML = '<i class="fa-solid fa-ban"></i> MP PENUH';
+    } else if (currentTeam.score < 150) {
+      buyMpBtn.disabled = true;
+      buyMpBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-game font-bold text-xs tracking-wider cursor-not-allowed opacity-60';
+      buyMpBtn.innerHTML = '<i class="fa-solid fa-coins"></i> SKOR KURANG';
+    } else {
+      buyMpBtn.disabled = false;
+      buyMpBtn.className = 'px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-game font-bold text-xs tracking-wider transition active:scale-95 shadow shrink-0 flex items-center justify-center gap-1.5 cursor-pointer';
+      buyMpBtn.innerHTML = '<i class="fa-solid fa-coins"></i> BELI (+1 MP)';
+    }
+  }
+
+  // Check LP (First Aid Kit) purchase eligibility
+  if (buyLpBtn) {
+    if (currentTeam.lp >= 100) {
+      buyLpBtn.disabled = true;
+      buyLpBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-game font-bold text-xs tracking-wider cursor-not-allowed opacity-60';
+      buyLpBtn.innerHTML = '<i class="fa-solid fa-ban"></i> LP MAKSIMAL';
+    } else if (currentTeam.score < 150) {
+      buyLpBtn.disabled = true;
+      buyLpBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-game font-bold text-xs tracking-wider cursor-not-allowed opacity-60';
+      buyLpBtn.innerHTML = '<i class="fa-solid fa-coins"></i> SKOR KURANG';
+    } else {
+      buyLpBtn.disabled = false;
+      buyLpBtn.className = 'px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-slate-950 font-game font-bold text-xs tracking-wider transition active:scale-95 shadow shrink-0 flex items-center justify-center gap-1.5 cursor-pointer';
+      buyLpBtn.innerHTML = '<i class="fa-solid fa-heart-pulse"></i> BELI (+40 LP)';
+    }
   }
 
   modal.classList.remove('hidden');
@@ -2149,6 +2173,7 @@ function openShopModal() {
 function closeShopModal() {
   const modal = document.getElementById('shop-modal');
   if (modal) modal.classList.add('hidden');
+  AudioManager.play('click');
 }
 
 function buyEmergencyMP() {
@@ -2161,6 +2186,24 @@ function buyEmergencyMP() {
   const MR = window.MapRenderer;
   if (MR) {
     MR.spawnFloatingText(currentTeam.x, currentTeam.y, '🛒 +1 MP DARURAT (-150 PTS)', '#f59e0b');
+  }
+  AudioManager.play('correct');
+
+  renderHUD();
+  closeShopModal();
+}
+
+function buyFirstAidKit() {
+  const currentTeam = teams[activeTeamIndex];
+  if (!currentTeam || currentTeam.score < 150 || currentTeam.lp >= 100) return;
+
+  currentTeam.score -= 150;
+  const healed = Math.min(100, currentTeam.lp + 40) - currentTeam.lp;
+  currentTeam.lp = Math.min(100, currentTeam.lp + 40);
+
+  const MR = window.MapRenderer;
+  if (MR) {
+    MR.spawnFloatingText(currentTeam.x, currentTeam.y, `🩹 +${healed} LP FIRST AID KIT (-150 PTS)`, '#34d399');
   }
   AudioManager.play('correct');
 
@@ -4620,6 +4663,7 @@ window.copyLANUrl = copyLANUrl;
 window.openShopModal = openShopModal;
 window.closeShopModal = closeShopModal;
 window.buyEmergencyMP = buyEmergencyMP;
+window.buyFirstAidKit = buyFirstAidKit;
 window.handleChallengePick = handleChallengePick;
 window.startChallengeBattle = startChallengeBattle;
 window.closeChallengeAndAdvanceTurn = closeChallengeAndAdvanceTurn;
